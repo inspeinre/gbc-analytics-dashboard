@@ -1,0 +1,32 @@
+[  
+ {
+    "firstName": "Лаура",
+    "lastName": "Амангельдина",
+    "phone": "+77045678925",
+    "email": "laura.amangeldina@example.com",
+    "orderType": "eshop-individual",
+    "orderMethod": "shopping-cart",
+    "status": "new",
+    "items": [
+      {
+        "productName": "Утягивающее боди Nova Body",
+        "quantity": 1,
+        "initialPrice": 35000
+      },
+      {
+        "productName": "Бюстье корректирующее Nova Lift",
+        "quantity": 1,
+        "initialPrice": 22000
+      }
+    ],
+    "delivery": {
+      "address": {
+        "city": "Алматы",
+        "text": "мкр. Орбита-2, д. 8, кв 29"
+      }
+    },
+    "customFields": {
+      "utm_source": "instagram"
+    }
+  }
+]

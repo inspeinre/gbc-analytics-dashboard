@@ -1,5 +1,6 @@
 import json
 import retailcrm
+import os
 
 # Данные для доступа к API
 URL = 'https://alex3d33.retailcrm.ru'
@@ -11,7 +12,8 @@ def main():
     crm_client = retailcrm.v5(URL, API_KEY)
     
     # Чтение данных заказов из JSON
-    json_filename = 'mock_orders.json'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    json_filename = os.path.join(script_dir, 'mock_orders1.json')
     try:
         with open(json_filename, 'r', encoding='utf-8') as file:
             orders = json.load(file)

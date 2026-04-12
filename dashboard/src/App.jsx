@@ -1,243 +1,196 @@
-import React, { useState, useMemo } from 'react';
-import initialOrders from './data/mock_orders.json'; // Позже заменим на запрос к Supabase
+import React, { useEffect, useState, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { DollarSign, ShoppingBag, Users, Target, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, ShoppingBag, Users, AlertCircle, RefreshCw } from 'lucide-react';
+import { format, parseISO, startOfDay } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
-const COLORS = {
-  instagram: '#E1306C', google: '#4285F4', tiktok: '#000000',
-  referral: '#8b5cf6', direct: '#6b7280', organic: '#10b981'
+// Инициализация Supabase
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+// Справочник статусов (коды из RetailCRM -> названия)
+const STATUS_MAP = {
+  'new': { label: 'Новый', color: '#3b82f6' },
+  'offer-replacement': { label: 'Предложить замену', color: '#f59e0b' }, // Ваш важный статус
+  'availability-confirmed': { label: 'В наличии', color: '#10b981' },
+  'cancel': { label: 'Отмена', color: '#ef4444' },
+  'complete': { label: 'Выполнен', color: '#6366f1' }
+};
+
+const ORDER_TYPES = {
+  'eshop-individual': 'Физ. лицо',
+  'eshop-legal': 'Юр. лицо'
 };
 
 const App = () => {
-  // Состояния для фильтров
-  const [filterCity, setFilterCity] = useState(null);
-  const [filterSource, setFilterSource] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // 1. Фильтрация данных
-  const filteredOrders = useMemo(() => {
-    return initialOrders.filter(order => {
-      const matchCity = filterCity ? order.delivery.address.city === filterCity : true;
-      const matchSource = filterSource ? order.customFields.utm_source === filterSource : true;
-      return matchCity && matchSource;
-    });
-  }, [filterCity, filterSource]);
+  // Загрузка данных
+  const fetchOrders = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  const sortedOrders = useMemo(() => {
-    let sortableItems = [...filteredOrders];
-    if (sortConfig.key) {
-      sortableItems.sort((a, b) => {
-        let aValue, bValue;
-        switch (sortConfig.key) {
-          case 'client':
-            aValue = `${a.firstName} ${a.lastName}`;
-            bValue = `${b.firstName} ${b.lastName}`;
-            break;
-          case 'city':
-            aValue = a.delivery?.address?.city || '';
-            bValue = b.delivery?.address?.city || '';
-            break;
-          case 'sum':
-            aValue = a.items.reduce((acc, item) => acc + (item.initialPrice * item.quantity), 0);
-            bValue = b.items.reduce((acc, item) => acc + (item.initialPrice * item.quantity), 0);
-            break;
-          case 'source':
-            aValue = a.customFields?.utm_source || '';
-            bValue = b.customFields?.utm_source || '';
-            break;
-          default:
-            aValue = '';
-            bValue = '';
-        }
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [filteredOrders, sortConfig]);
-
-  const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key) {
-      if (sortConfig.direction === 'asc') {
-        direction = 'desc';
-      } else {
-        // Если уже было по убыванию, то при следующем клике отменяем сортировку
-        setSortConfig({ key: null, direction: 'asc' });
-        return;
-      }
-    }
-    setSortConfig({ key, direction });
+    if (!error) setOrders(data);
+    setLoading(false);
   };
 
-  const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return <ArrowUpDown size={14} className="text-slate-300 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    return sortConfig.direction === 'asc'
-      ? <ArrowUp size={14} className="text-blue-500 ml-1" />
-      : <ArrowDown size={14} className="text-blue-500 ml-1" />;
-  };
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
-  // 2. Расчет KPI на основе отфильтрованных данных
+  // 1. Расчет KPI
   const stats = useMemo(() => {
-    const revenue = filteredOrders.reduce((sum, order) =>
-      sum + order.items.reduce((acc, item) => acc + (item.initialPrice * item.quantity), 0), 0
-    );
+    const revenue = orders.reduce((sum, o) => sum + Number(o.total_summ), 0);
+    const replacements = orders.filter(o => o.status === 'offer-replacement').length;
     return {
       revenue,
-      count: filteredOrders.length,
-      average: filteredOrders.length > 0 ? Math.round(revenue / filteredOrders.length) : 0
+      count: orders.length,
+      avgCheck: orders.length ? Math.round(revenue / orders.length) : 0,
+      replacements
     };
-  }, [filteredOrders]);
+  }, [orders]);
 
-  // 3. Данные для графиков (всегда показываем общую картину, но подсвечиваем выбор)
-  const utmData = useMemo(() => {
-    const raw = initialOrders.reduce((acc, order) => {
-      const source = order.customFields?.utm_source || 'organic';
-      acc[source] = (acc[source] || 0) + 1;
+  // 2. Данные для графика динамики (по дням)
+  const chartData = useMemo(() => {
+    const groups = orders.reduce((acc, o) => {
+      const date = format(parseISO(o.created_at), 'dd MMM', { locale: ru });
+      acc[date] = (acc[date] || 0) + Number(o.total_summ);
       return acc;
     }, {});
-    return Object.keys(raw).map(key => ({ name: key, value: raw[key] }));
-  }, []);
+    return Object.keys(groups).map(date => ({ date, amount: groups[date] })).reverse();
+  }, [orders]);
 
-  const cityData = useMemo(() => {
-    const raw = initialOrders.reduce((acc, order) => {
-      const city = order.delivery.address.city;
-      acc[city] = (acc[city] || 0) + 1;
+  // 3. Распределение по статусам
+  const statusData = useMemo(() => {
+    const groups = orders.reduce((acc, o) => {
+      acc[o.status] = (acc[o.status] || 0) + 1;
       return acc;
     }, {});
-    return Object.keys(raw).map(key => ({ name: key, value: raw[key] }))
-      .sort((a, b) => b.value - a.value).slice(0, 10);
-  }, []);
+    return Object.keys(groups).map(key => ({
+      name: STATUS_MAP[key]?.label || key,
+      value: groups[key],
+      color: STATUS_MAP[key]?.color || '#94a3b8'
+    }));
+  }, [orders]);
+
+  if (loading) return <div className="flex h-screen items-center justify-center">Загрузка данных...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900 font-sans">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
 
-        {/* Header & Reset Filters */}
-        <header className="flex justify-between items-end mb-8">
+        {/* Header */}
+        <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight">GBC ANALYTICS</h1>
-            <p className="text-slate-500">Система управления заказами</p>
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Nova Dashboard</h1>
+            <p className="text-slate-500 text-sm font-medium">Live данные из Supabase + RetailCRM</p>
           </div>
-          {(filterCity || filterSource) && (
-            <button
-              onClick={() => { setFilterCity(null); setFilterSource(null); }}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-all shadow-sm"
-            >
-              <XCircle size={18} /> Сбросить фильтры
-            </button>
-          )}
+          <button
+            onClick={fetchOrders}
+            className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
         </header>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <KpiCard title="Выручка выборки" value={`${stats.revenue.toLocaleString()} ₸`} icon={<DollarSign />} color="text-emerald-600" bg="bg-emerald-50" />
-          <KpiCard title="Заказов" value={stats.count} icon={<ShoppingBag />} color="text-blue-600" bg="bg-blue-50" />
-          <KpiCard title="Средний чек" value={`${stats.average.toLocaleString()} ₸`} icon={<Users />} color="text-violet-600" bg="bg-violet-50" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <KpiCard title="Выручка" value={`${stats.revenue.toLocaleString()} ₸`} icon={<DollarSign />} color="text-emerald-600" bg="bg-emerald-50" />
+          <KpiCard title="Заказы" value={stats.count} icon={<ShoppingBag />} color="text-blue-600" bg="bg-blue-50" />
+          <KpiCard title="Средний чек" value={`${stats.avgCheck.toLocaleString()} ₸`} icon={<Users />} color="text-violet-600" bg="bg-violet-50" />
+          <KpiCard title="Нужна замена" value={stats.replacements} icon={<AlertCircle />} color="text-amber-600" bg="bg-amber-50" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* UTM Chart */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Target size={20} className="text-slate-400" /> Источники (нажми для фильтра)
-            </h2>
-            <div className="h-64">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Динамика выручки */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <h2 className="text-lg font-bold mb-6">Динамика выручки</h2>
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={utmData}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    onClick={(data) => setFilterSource(data.name)}
-                    className="cursor-pointer"
-                  >
-                    {utmData.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={COLORS[entry.name] || '#ccc'}
-                        stroke={filterSource === entry.name ? '#000' : 'none'}
-                        strokeWidth={3}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                  <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={4} dot={{ r: 4, fill: '#3b82f6' }} activeDot={{ r: 8 }} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* City Chart */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold mb-4">Топ городов (нажми для фильтра)</h2>
-            <div className="h-64">
+          {/* Статусы */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <h2 className="text-lg font-bold mb-6">Статусы заказов</h2>
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cityData} onClick={(data) => data && setFilterCity(data.activeLabel)}>
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis hide />
-                  <Tooltip cursor={{ fill: '#f1f5f9' }} />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {cityData.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={filterCity === entry.name ? '#3b82f6' : '#cbd5e1'}
-                        className="cursor-pointer"
-                      />
+                <PieChart>
+                  <Pie data={statusData} innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="value">
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                  </Bar>
-                </BarChart>
+                  </Pie>
+                  <Tooltip />
+                  <Legend iconType="circle" />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
         {/* Таблица */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h2 className="text-xl font-bold">Список заказов {filterCity && `в г. ${filterCity}`}</h2>
-            <span className="text-sm bg-slate-100 px-3 py-1 rounded-full text-slate-600">
-              Найдено: {filteredOrders.length}
-            </span>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-50">
+            <h2 className="text-lg font-bold">Последние заказы</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
                 <tr>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => requestSort('client')}>
-                    <div className="flex items-center">Клиент {renderSortIcon('client')}</div>
-                  </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => requestSort('city')}>
-                    <div className="flex items-center">Город {renderSortIcon('city')}</div>
-                  </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => requestSort('sum')}>
-                    <div className="flex items-center">Сумма {renderSortIcon('sum')}</div>
-                  </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => requestSort('source')}>
-                    <div className="flex items-center">Источник {renderSortIcon('source')}</div>
-                  </th>
+                  <th className="px-6 py-4">ID / Номер</th>
+                  <th className="px-6 py-4">Клиент / Город</th>
+                  <th className="px-6 py-4">Тип</th>
+                  <th className="px-6 py-4">Сумма</th>
+                  <th className="px-6 py-4">Статус</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sortedOrders.map((order, i) => (
-                  <tr key={i} className="hover:bg-blue-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-700">{order.firstName} {order.lastName}</td>
-                    <td className="px-6 py-4 text-slate-600">{order.delivery.address.city}</td>
+              <tbody className="divide-y divide-slate-50">
+                {orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-slate-700">#{order.number}</div>
+                      <div className="text-[10px] text-slate-400">ID: {order.id}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-slate-700">{order.first_name} {order.last_name}</div>
+                      <div className="text-xs text-slate-400">{order.city || '—'}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                        {ORDER_TYPES[order.order_type] || order.order_type}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 font-bold text-slate-900">
-                      {order.items.reduce((acc, item) => acc + (item.initialPrice * item.quantity), 0).toLocaleString()} ₸
+                      {Number(order.total_summ).toLocaleString()} ₸
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className="px-2 py-1 rounded text-[10px] font-bold uppercase border"
-                        style={{ color: COLORS[order.customFields.utm_source], borderColor: COLORS[order.customFields.utm_source] }}
+                        className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                        style={{
+                          backgroundColor: `${STATUS_MAP[order.status]?.color}20`,
+                          color: STATUS_MAP[order.status]?.color
+                        }}
                       >
-                        {order.customFields.utm_source}
+                        {STATUS_MAP[order.status]?.label || order.status}
                       </span>
                     </td>
                   </tr>
@@ -252,11 +205,11 @@ const App = () => {
 };
 
 const KpiCard = ({ title, value, icon, color, bg }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-5">
-    <div className={`p-4 ${bg} ${color} rounded-xl`}>{icon}</div>
+  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-5">
+    <div className={`p-4 ${bg} ${color} rounded-2xl shadow-inner`}>{icon}</div>
     <div>
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{title}</p>
-      <p className="text-2xl font-black text-slate-800">{value}</p>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+      <p className="text-xl font-black text-slate-800 tracking-tight">{value}</p>
     </div>
   </div>
 );
