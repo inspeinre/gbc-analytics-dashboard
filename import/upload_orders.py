@@ -20,7 +20,7 @@ def main():
                 orders = [orders]
                 
             # Берем только 1 первый заказ для новой проверки
-            orders = orders[:1]
+            # orders = orders[:1]
     except FileNotFoundError:
         print(f"Ошибка: Файл {json_filename} не найден.")
         return
