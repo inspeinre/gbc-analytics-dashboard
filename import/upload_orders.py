@@ -19,8 +19,8 @@ def main():
             if isinstance(orders, dict):
                 orders = [orders]
                 
-            # Берем только 1 первый заказ для новой проверки
-            # orders = orders[:1]
+            # Берем только 1 первый заказ для проверки
+            orders = orders[:1]
     except FileNotFoundError:
         print(f"Ошибка: Файл {json_filename} не найден.")
         return
