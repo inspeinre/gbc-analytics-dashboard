@@ -2,33 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-    .glass-panel {
-        @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-sm;
-    }
-
-    .chart-transition {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-}
-
-/* Стилизация скроллбара для таблицы */
 @layer base {
+    body {
+        @apply bg-[#020617] text-slate-300 antialiased;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+        background-attachment: fixed;
+    }
+
+    /* Кастомный скроллбар для темной темы */
     ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
     }
 
     ::-webkit-scrollbar-track {
-        background-color: theme('colors.slate.100');
+        background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
-        background-color: theme('colors.slate.300');
-        border-radius: 9999px;
+        background: theme('colors.slate.800');
+        border-radius: 10px;
+        border: 2px solid theme('colors.slate.950');
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background-color: theme('colors.slate.400');
+        background: theme('colors.slate.700');
+    }
+}
+
+@layer components {
+    .glass-card {
+        @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+    }
+
+    .glass-panel {
+        @apply bg-slate-900/40 backdrop-blur-md border border-slate-800 shadow-lg;
+    }
+
+    .neon-text-blue {
+        text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    }
+
+    .neon-text-emerald {
+        text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    .chart-transition {
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 }
