@@ -12,7 +12,7 @@ const getCrmUrl = (endpoint) => {
 };
 
 const formatOrder = (order) => {
-    if (!order) return null;
+    if (!order || typeof order !== 'object') return null;
     return {
         id: order.id,
         number: order.number || 'Без номера',
@@ -33,7 +33,6 @@ export default async function handler(req, res) {
     try {
         const apiKey = process.env.CRM_API_KEY;
 
-        // 1. Ручной импорт
         if (req.query.manual === 'true') {
             const response = await axios.get(getCrmUrl('/orders'), { params: { apiKey, limit: 100 } });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
@@ -41,7 +40,6 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
         }
 
-        // 2. Обработка вебхука (Извлекаем ID из строки "order[id=172]")
         let orderId = null;
         const rawOrder = req.body?.order || req.query?.order;
 
@@ -56,21 +54,17 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "ID заказа не найден" });
         }
 
-        // 3. Запрос данных из API RetailCRM по ID
-        const finalUrl = getCrmUrl(`/orders/${orderId}`);
-        console.log("ПОЛНЫЙ ЗАПРОС В CRM:", finalUrl); // Эта строка покажет нам правду
-        const response = await axios.get(finalUrl, {
-            params: { apiKey }
+        // ПРЯМОЙ ЗАПРОС К CRM
+        const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
+            params: { apiKey, by: 'id' }
         });
 
         if (!response.data.success) {
             return res.status(404).json({ error: "Заказ не найден в CRM" });
         }
 
-        // 4. Сохранение в Supabase
         const formatted = formatOrder(response.data.order);
         const { error } = await supabase.from('orders').upsert(formatted);
-
         if (error) throw error;
 
         return res.status(200).send('OK');
