@@ -33,55 +33,63 @@ const formatOrder = (order) => {
 export default async function handler(req, res) {
     try {
         const apiKey = process.env.CRM_API_KEY;
+        if (!apiKey) throw new Error("Переменная CRM_API_KEY не задана в Vercel");
 
-        // 1. РУЧНОЙ ИМПОРТ (без изменений)
+        // 1. РЕЖИМ РУЧНОГО ИМПОРТА
         if (req.query.manual === 'true') {
-            const response = await axios.get(getCrmUrl('/orders'), { params: { apiKey, limit: 100 } });
+            const response = await axios.get(getCrmUrl('/orders'), {
+                params: { apiKey, limit: 100 }
+            });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
             const { error } = await supabase.from('orders').upsert(ordersToUpsert);
             if (error) throw error;
-            return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
+            return res.status(200).json({ message: `Успешно импортировано ${ordersToUpsert.length} заказов` });
         }
 
-        // 2. ОБРАБОТКА ВЕБХУКА (Спец. разбор для формата order[id=172])
-        let orderId = null;
+        // 2. ОБРАБОТКА ВЕБХУКА
+        let orderData = null;
 
         if (req.body && req.body.order) {
             const rawOrder = req.body.order;
-
             if (typeof rawOrder === 'string') {
-                // Ищем цифры внутри строки (например, из "order[id=172]" вытащим "172")
-                const match = rawOrder.match(/\d+/);
-                if (match) {
-                    orderId = match[0];
+                try {
+                    // Пытаемся распарсить JSON
+                    orderData = JSON.parse(rawOrder);
+                } catch (e) {
+                    // Если не JSON, оставляем строку для дальнейшего поиска ID
+                    orderData = null;
                 }
-            } else if (typeof rawOrder === 'object' && rawOrder.id) {
-                // Если вдруг пришел объект, просто берем его id
-                orderId = rawOrder.id;
+            } else {
+                orderData = rawOrder;
             }
         }
 
-        if (!orderId) {
-            console.log("ID заказа не найден в запросе. Body:", req.body);
-            return res.status(400).json({ error: "ID заказа не найден в поле 'order'" });
+        // Если в Body нет готового объекта, ищем ID в строке (в Body или Query)
+        if (!orderData) {
+            const rawString = typeof req.body === 'string' ? req.body : (req.body?.order || req.query?.order || '');
+            const match = String(rawString).match(/\d+/);
+
+            if (match) {
+                const orderId = match[0];
+                console.log(`Поиск данных по ID: ${orderId}`);
+                try {
+                    const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
+                        params: { apiKey }
+                    });
+                    if (response.data.success) {
+                        orderData = response.data.order;
+                    }
+                } catch (e) {
+                    console.error("Ошибка API при дозагрузке заказа:", e.message);
+                }
+            }
         }
 
-        // 3. ЗАПРОС ПОЛНЫХ ДАННЫХ ИЗ API CRM
-        console.log(`Запрос полных данных для заказа ID: ${orderId}`);
-        const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
-            params: { apiKey, by: 'id' }
-        });
-
-        if (!response.data.success) {
-            throw new Error("CRM вернула ошибку при запросе заказа");
+        if (!orderData) {
+            return res.status(400).json({ error: "Заказ не найден в запросе и в API" });
         }
 
-        const orderData = response.data.order;
         const formatted = formatOrder(orderData);
-
-        if (!formatted) throw new Error("Не удалось отформатировать данные заказа");
-
-        // 4. СОХРАНЕНИЕ В SUPABASE
         const { error } = await supabase.from('orders').upsert(formatted);
         if (error) throw error;
 
