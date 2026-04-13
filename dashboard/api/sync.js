@@ -8,7 +8,11 @@ const supabase = createClient(
 
 const getCrmUrl = (endpoint) => {
     const subdomain = process.env.CRM_SUBDOMAIN;
-    return `https://${subdomain}.retailcrm.ru/api/v5${endpoint}`;
+    if (!subdomain) {
+        throw new Error("CRM_SUBDOMAIN is not defined in Environment Variables");
+    }
+    // Используем конструктор URL для соответствия стандартам WHATWG
+    return new URL(`https://${subdomain.trim()}.retailcrm.ru/api/v5${endpoint}`);
 };
 
 const formatOrder = (order) => {
