@@ -13,7 +13,7 @@ def main():
     
     # Чтение данных заказов из JSON
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_filename = os.path.join(script_dir, 'mock_orders1.json')
+    json_filename = os.path.join(script_dir, 'mock_orders.json')
     try:
         with open(json_filename, 'r', encoding='utf-8') as file:
             orders = json.load(file)
@@ -22,7 +22,7 @@ def main():
                 orders = [orders]
                 
             # Берем только 1 первый заказ для проверки
-            orders = orders[:1]
+            # orders = orders[:1]
     except FileNotFoundError:
         print(f"Ошибка: Файл {json_filename} не найден.")
         return

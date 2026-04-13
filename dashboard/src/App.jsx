@@ -16,8 +16,8 @@ const supabase = createClient(
 
 const STATUS_MAP = {
   'new': { label: 'Новый', color: '#64748b' },
-  'offer-replacement': { label: 'Замена', color: '#f59e0b' },
-  'offer-analog': { label: 'Аналог', color: '#f59e0b' }, // Добавлен аналог
+  'offer-replacement': { label: 'Предложить замену', color: '#f59e0b' },
+  'offer-analog': { label: 'Предложить замену', color: '#f59e0b' }, // Теперь тоже "Предложить замену"
   'availability-confirmed': { label: 'В наличии', color: '#10b981' },
   'cancel': { label: 'Отмена', color: '#ef4444' },
   'complete': { label: 'Выполнен', color: '#6366f1' },
@@ -51,8 +51,8 @@ const App = () => {
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error) setRawOrders(data);
-    setLoading(false);
+    if (!//error) setRawOrders(data);
+      setLoading(false);
   };
 
   useEffect(() => { fetchOrders(); }, []);
@@ -109,7 +109,7 @@ const App = () => {
     return { revenue, count: processedOrders.length, avg: processedOrders.length ? Math.round(revenue / processedOrders.length) : 0 };
   }, [processedOrders]);
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400">Загрузка данных...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400">Загрузка...</div>;
 
   return (
     <div className="min-h-screen bg-[#f1f5f9] p-4 md:p-8 text-slate-700 font-sans tracking-tight">
@@ -118,26 +118,24 @@ const App = () => {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">NOVA ANALYTICS</h1>
-            <p className="text-slate-500 font-semibold text-[11px] uppercase tracking-widest">Control Panel v2.1</p>
+            <p className="text-slate-500 font-semibold text-[11px] uppercase tracking-widest">Control Panel v2.2</p>
           </div>
           <div className="flex gap-2">
             {(filterCity || filterUTM || sortConfig.key) && (
-              <button onClick={() => { setFilterCity(null); setFilterUTM(null); setSortConfig({ key: null, direction: null }); }} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg hover:bg-slate-50 font-bold shadow-sm text-xs">
+              <button onClick={() => { setFilterCity(null); setFilterUTM(null); setSortConfig({ key: null, direction: null }); }} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg hover:bg-slate-50 font-bold shadow-sm text-xs transition-all">
                 <XCircle size={14} /> Сброс
               </button>
             )}
-            <button onClick={fetchOrders} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"><RefreshCw size={18} className="text-slate-400" /></button>
+            <button onClick={fetchOrders} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-all"><RefreshCw size={18} className="text-slate-400" /></button>
           </div>
         </header>
 
-        {/* KPI */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <KpiCard title="Оборот" value={`${stats.revenue.toLocaleString()} ₸`} icon={<DollarSign />} color="text-slate-600" bg="bg-white" />
           <KpiCard title="Заказы" value={stats.count} icon={<ShoppingBag />} color="text-slate-600" bg="bg-white" />
           <KpiCard title="Средний чек" value={`${stats.avg.toLocaleString()} ₸`} icon={<Users />} color="text-slate-600" bg="bg-white" />
         </div>
 
-        {/* Графики */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
@@ -175,7 +173,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* ТАБЛИЦА */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -185,8 +182,8 @@ const App = () => {
                   <SortableHeader label="Номер" columnKey="number" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Клиент" columnKey="first_name" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Город" columnKey="city" currentSort={sortConfig} onSort={requestSort} />
-                  <SortableHeader label="Источник" columnKey="utm_source" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Сумма" columnKey="total_summ" currentSort={sortConfig} onSort={requestSort} />
+                  <SortableHeader label="Источник" columnKey="utm_source" currentSort={sortConfig} onSort={requestSort} />
                   <th className="px-6 py-4 text-center">Статус</th>
                 </tr>
               </thead>
@@ -199,6 +196,9 @@ const App = () => {
                     <td className="px-6 py-4 text-xs font-bold text-slate-700">#{order.number}</td>
                     <td className="px-6 py-4 text-xs text-slate-600 font-semibold">{order.first_name} {order.last_name}</td>
                     <td className="px-6 py-4 text-xs text-slate-500 font-medium">{order.city || '—'}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800 text-xs">
+                      {Number(order.total_summ).toLocaleString()} <span className="text-[10px] text-slate-400 uppercase">₸</span>
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className="text-[9px] font-bold px-2 py-1 rounded border"
@@ -206,9 +206,6 @@ const App = () => {
                       >
                         {UTM_MAP[order.utm_source || 'direct']?.label}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-800 text-xs">
-                      {Number(order.total_summ).toLocaleString()} ₸
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider border border-slate-100 bg-white shadow-sm"
@@ -231,11 +228,11 @@ const SortableHeader = ({ label, columnKey, currentSort, onSort }) => {
   const isActive = currentSort.key === columnKey;
   return (
     <th
-      className={`px-6 py-4 cursor-pointer select-none transition-all ${isActive ? 'bg-slate-100 text-emerald-600' : 'hover:bg-slate-50'}`}
+      className="px-6 py-4 cursor-pointer select-none transition-all hover:text-slate-700"
       onClick={() => onSort(columnKey)}
     >
-      <div className="flex items-center gap-1.5 h-4"> {/* Фиксированная высота предотвращает скачки */}
-        <span>{label}</span>
+      <div className="flex items-center gap-1.5 h-4">
+        <span className={isActive ? 'text-slate-800 font-bold' : ''}>{label}</span>
         <div className="w-4 flex justify-center">
           {isActive && currentSort.direction === 'asc' && <ChevronUp size={14} strokeWidth={3} className="text-emerald-500" />}
           {isActive && currentSort.direction === 'desc' && <ChevronDown size={14} strokeWidth={3} className="text-emerald-500" />}
