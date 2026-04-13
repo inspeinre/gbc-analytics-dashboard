@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-import querystring from 'querystring'; // Добавили библиотеку для ручного разбора
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -29,8 +28,15 @@ const formatOrder = (order) => {
 };
 
 export default async function handler(req, res) {
+    // --- ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ ---
+    console.log("=== НОВЫЙ ЗАПРОС ===");
+    console.log("Метод:", req.method);
+    console.log("Заголовки:", JSON.stringify(req.headers));
+    console.log("Тело (Body):", req.body);
+    console.log("Параметры (Query):", req.query);
+    // ------------------------------
+
     try {
-        // 1. РЕЖИМ РУЧНОГО ИМПОРТА
         if (req.query.manual === 'true') {
             const response = await axios.get(CRM_URL, { params: { apiKey: CRM_KEY, limit: 100 } });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
@@ -39,37 +45,28 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
         }
 
-        // 2. ОБРАБОТКА ВЕБХУКА
         let orderData = null;
 
-        // Пытаемся достать данные из Body разными способами
-        if (req.body) {
-            if (typeof req.body === 'string') {
-                // Если пришел сырой текст (urlencoded), разбираем его вручную
-                const parsedBody = querystring.parse(req.body);
-                if (parsedBody.order) {
-                    try {
-                        orderData = JSON.parse(parsedBody.order);
-                    } catch (e) {
-                        orderData = parsedBody.order;
-                    }
-                }
-            } else if (req.body.order) {
-                // Если Vercel уже распарсил тело в объект
-                orderData = typeof req.body.order === 'string' ? JSON.parse(req.body.order) : req.body.order;
+        // 1. Пробуем достать из Body (если это JSON или объект)
+        if (req.body && req.body.order) {
+            orderData = typeof req.body.order === 'string' ? JSON.parse(req.body.order) : req.body.order;
+        }
+        // 2. Если Body пустое, пробуем достать из Query (строка адреса)
+        else if (req.query && req.query.order) {
+            try {
+                orderData = typeof req.query.order === 'string' ? JSON.parse(req.query.order) : req.query.order;
+            } catch (e) {
+                console.error("Ошибка парсинга order из query:", e.message);
             }
         }
 
-        // Если в Body ничего нет, проверяем Query (строку адреса)
-        if (!orderData && req.query.order) {
-            try {
-                orderData = typeof req.query.order === 'string' ? JSON.parse(req.query.order) : req.query.order;
-            } catch (e) { }
-        }
-
         if (!orderData) {
-            console.log("Данные не найдены. Body:", req.body);
-            return res.status(400).send('No order data found');
+            // Вместо простой ошибки 400, возвращаем детали того, что пришло
+            return res.status(400).json({
+                error: 'No order data found',
+                receivedBody: req.body,
+                receivedQuery: req.query
+            });
         }
 
         const formatted = formatOrder(orderData);
