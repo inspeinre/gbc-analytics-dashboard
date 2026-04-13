@@ -92,7 +92,7 @@ const App = () => {
         {/* Header */}
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Nova Dashboard</h1>
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">GBC Analytics Dashboard</h1>
             <p className="text-slate-500 text-sm font-medium">Live данные из Supabase + RetailCRM</p>
           </div>
           <button
