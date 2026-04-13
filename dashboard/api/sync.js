@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
+import querystring from 'querystring';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -28,15 +29,12 @@ const formatOrder = (order) => {
 };
 
 export default async function handler(req, res) {
-    // --- ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ ---
-    console.log("=== НОВЫЙ ЗАПРОС ===");
+    console.log("=== ВХОДЯЩИЙ ЗАПРОС ===");
     console.log("Метод:", req.method);
-    console.log("Заголовки:", JSON.stringify(req.headers));
-    console.log("Тело (Body):", req.body);
-    console.log("Параметры (Query):", req.query);
-    // ------------------------------
+    console.log("Headers Content-Type:", req.headers['content-type']);
 
     try {
+        // 1. РЕЖИМ РУЧНОГО ИМПОРТА
         if (req.query.manual === 'true') {
             const response = await axios.get(CRM_URL, { params: { apiKey: CRM_KEY, limit: 100 } });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
@@ -45,27 +43,31 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
         }
 
+        // 2. РАЗБОР ДАННЫХ (Самая важная часть)
         let orderData = null;
 
-        // 1. Пробуем достать из Body (если это JSON или объект)
-        if (req.body && req.body.order) {
+        // Сценарий А: Vercel уже распарсил тело в объект
+        if (req.body && typeof req.body === 'object' && req.body.order) {
             orderData = typeof req.body.order === 'string' ? JSON.parse(req.body.order) : req.body.order;
         }
-        // 2. Если Body пустое, пробуем достать из Query (строка адреса)
-        else if (req.query && req.query.order) {
-            try {
-                orderData = typeof req.query.order === 'string' ? JSON.parse(req.query.order) : req.query.order;
-            } catch (e) {
-                console.error("Ошибка парсинга order из query:", e.message);
+        // Сценарий Б: Тело пришло как строка (urlencode) - разбираем вручную
+        else if (typeof req.body === 'string') {
+            const parsed = querystring.parse(req.body);
+            if (parsed.order) {
+                orderData = typeof parsed.order === 'string' ? JSON.parse(parsed.order) : parsed.order;
             }
+        }
+        // Сценарий В: Данные прислали в строке запроса (Query)
+        else if (req.query && req.query.order) {
+            const rawOrder = req.query.order;
+            orderData = typeof rawOrder === 'string' ? JSON.parse(rawOrder) : rawOrder;
         }
 
         if (!orderData) {
-            // Вместо простой ошибки 400, возвращаем детали того, что пришло
+            console.log("Данные заказа не найдены. Body:", req.body, "Query:", req.query);
             return res.status(400).json({
-                error: 'No order data found',
-                receivedBody: req.body,
-                receivedQuery: req.query
+                error: "Данные заказа не найдены",
+                received_body: req.body
             });
         }
 
