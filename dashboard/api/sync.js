@@ -37,9 +37,7 @@ export default async function handler(req, res) {
 
         // 1. РЕЖИМ РУЧНОГО ИМПОРТА
         if (req.query.manual === 'true') {
-            const response = await axios.get(getCrmUrl('/orders'), {
-                params: { apiKey, limit: 100 }
-            });
+            const response = await axios.get(getCrmUrl('/orders'), { params: { apiKey, limit: 100 } });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
             const { error } = await supabase.from('orders').upsert(ordersToUpsert);
             if (error) throw error;
@@ -48,45 +46,45 @@ export default async function handler(req, res) {
 
         // 2. ОБРАБОТКА ВЕБХУКА
         let orderData = null;
+        let rawValue = null;
 
+        // Проверяем Body
         if (req.body && req.body.order) {
-            const rawOrder = req.body.order;
-            if (typeof rawOrder === 'string') {
+            rawValue = req.body.order;
+            if (typeof rawValue === 'string') {
                 try {
-                    // Пытаемся распарсить JSON
-                    orderData = JSON.parse(rawOrder);
+                    orderData = JSON.parse(rawValue);
                 } catch (e) {
-                    // Если не JSON, оставляем строку для дальнейшего поиска ID
-                    orderData = null;
+                    // Если не JSON, оставляем строку для извлечения ID ниже
                 }
             } else {
-                orderData = rawOrder;
+                orderData = rawValue;
             }
         }
+        // Проверяем Query
+        else if (req.query && req.query.order) {
+            rawValue = req.query.order;
+            try {
+                orderData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+            } catch (e) { }
+        }
 
-        // Если в Body нет готового объекта, ищем ID в строке (в Body или Query)
-        if (!orderData) {
-            const rawString = typeof req.body === 'string' ? req.body : (req.body?.order || req.query?.order || '');
-            const match = String(rawString).match(/\d+/);
-
+        // 3. ИЗВЛЕЧЕНИЕ ID И ЗАПРОС В API (если пришла строка типа "order[id=173]")
+        if (!orderData && typeof rawValue === 'string') {
+            const match = rawValue.match(/\d+/);
             if (match) {
                 const orderId = match[0];
-                console.log(`Поиск данных по ID: ${orderId}`);
-                try {
-                    const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
-                        params: { apiKey }
-                    });
-                    if (response.data.success) {
-                        orderData = response.data.order;
-                    }
-                } catch (e) {
-                    console.error("Ошибка API при дозагрузке заказа:", e.message);
+                const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
+                    params: { apiKey }
+                });
+                if (response.data.success) {
+                    orderData = response.data.order;
                 }
             }
         }
 
         if (!orderData) {
-            return res.status(400).json({ error: "Заказ не найден в запросе и в API" });
+            return res.status(400).json({ error: "Заказ не найден" });
         }
 
         const formatted = formatOrder(orderData);
@@ -96,7 +94,7 @@ export default async function handler(req, res) {
         return res.status(200).send('OK');
 
     } catch (globalError) {
-        console.error("Ошибка сервера:", globalError.message);
+        console.error("Ошибка:", globalError.message);
         return res.status(500).json({ error: globalError.message });
     }
 }
