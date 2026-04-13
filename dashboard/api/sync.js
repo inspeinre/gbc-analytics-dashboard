@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-import querystring from 'querystring';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -11,7 +10,9 @@ const CRM_URL = `https://${process.env.CRM_SUBDOMAIN}.retailcrm.ru/api/v5/orders
 const CRM_KEY = process.env.CRM_API_KEY;
 
 const formatOrder = (order) => {
+    // Если пришел не объект, а строка или null - возвращаем null
     if (!order || typeof order !== 'object') return null;
+
     return {
         id: order.id,
         number: order.number || 'Без номера',
@@ -29,10 +30,6 @@ const formatOrder = (order) => {
 };
 
 export default async function handler(req, res) {
-    console.log("=== ВХОДЯЩИЙ ЗАПРОС ===");
-    console.log("Метод:", req.method);
-    console.log("Headers Content-Type:", req.headers['content-type']);
-
     try {
         // 1. РЕЖИМ РУЧНОГО ИМПОРТА
         if (req.query.manual === 'true') {
@@ -43,35 +40,38 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
         }
 
-        // 2. РАЗБОР ДАННЫХ (Самая важная часть)
+        // 2. ОБРАБОТКА ВЕБХУКА
         let orderData = null;
 
-        // Сценарий А: Vercel уже распарсил тело в объект
-        if (req.body && typeof req.body === 'object' && req.body.order) {
-            orderData = typeof req.body.order === 'string' ? JSON.parse(req.body.order) : req.body.order;
-        }
-        // Сценарий Б: Тело пришло как строка (urlencode) - разбираем вручную
-        else if (typeof req.body === 'string') {
-            const parsed = querystring.parse(req.body);
-            if (parsed.order) {
-                orderData = typeof parsed.order === 'string' ? JSON.parse(parsed.order) : parsed.order;
+        if (req.body && req.body.order) {
+            const rawOrder = req.body.order;
+            if (typeof rawOrder === 'string') {
+                try {
+                    // Пытаемся распарсить строку в JSON
+                    orderData = JSON.parse(rawOrder);
+                } catch (e) {
+                    // Если это не JSON (например, просто строка "order 169"), 
+                    // мы НЕ роняем сервер, а просто фиксируем ошибку в логах
+                    console.error("Данные в поле 'order' не являются JSON-объектом. Пришло:", rawOrder);
+                    orderData = null;
+                }
+            } else {
+                orderData = rawOrder;
             }
-        }
-        // Сценарий В: Данные прислали в строке запроса (Query)
-        else if (req.query && req.query.order) {
-            const rawOrder = req.query.order;
-            orderData = typeof rawOrder === 'string' ? JSON.parse(rawOrder) : rawOrder;
         }
 
         if (!orderData) {
-            console.log("Данные заказа не найдены. Body:", req.body, "Query:", req.query);
             return res.status(400).json({
-                error: "Данные заказа не найдены",
-                received_body: req.body
+                error: "Invalid data format",
+                message: "Ожидался JSON-объект заказа, но получена строка или пустое значение."
             });
         }
 
         const formatted = formatOrder(orderData);
+        if (!formatted) {
+            return res.status(400).send('Order object is invalid');
+        }
+
         const { error } = await supabase.from('orders').upsert(formatted);
         if (error) throw error;
 
