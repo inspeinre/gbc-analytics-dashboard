@@ -8,12 +8,11 @@ const supabase = createClient(
 
 const getCrmUrl = (endpoint) => {
     const subdomain = process.env.CRM_SUBDOMAIN;
-    if (!subdomain) throw new Error("Переменная CRM_SUBDOMAIN не задана в Vercel");
     return `https://${subdomain}.retailcrm.ru/api/v5${endpoint}`;
 };
 
 const formatOrder = (order) => {
-    if (!order || typeof order !== 'object') return null;
+    if (!order) return null;
     return {
         id: order.id,
         number: order.number || 'Без номера',
@@ -33,68 +32,49 @@ const formatOrder = (order) => {
 export default async function handler(req, res) {
     try {
         const apiKey = process.env.CRM_API_KEY;
-        if (!apiKey) throw new Error("Переменная CRM_API_KEY не задана в Vercel");
 
-        // 1. РЕЖИМ РУЧНОГО ИМПОРТА
+        // 1. Ручной импорт
         if (req.query.manual === 'true') {
             const response = await axios.get(getCrmUrl('/orders'), { params: { apiKey, limit: 100 } });
             const ordersToUpsert = response.data.orders.map(formatOrder).filter(Boolean);
-            const { error } = await supabase.from('orders').upsert(ordersToUpsert);
-            if (error) throw error;
-            return res.status(200).json({ message: `Успешно импортировано ${ordersToUpsert.length} заказов` });
+            await supabase.from('orders').upsert(ordersToUpsert);
+            return res.status(200).json({ message: `Импортировано ${ordersToUpsert.length} заказов` });
         }
 
-        // 2. ОБРАБОТКА ВЕБХУКА
-        let orderData = null;
-        let rawValue = null;
+        // 2. Обработка вебхука (Извлекаем ID из строки "order[id=172]")
+        let orderId = null;
+        const rawOrder = req.body?.order || req.query?.order;
 
-        // Проверяем Body
-        if (req.body && req.body.order) {
-            rawValue = req.body.order;
-            if (typeof rawValue === 'string') {
-                try {
-                    orderData = JSON.parse(rawValue);
-                } catch (e) {
-                    // Если не JSON, оставляем строку для извлечения ID ниже
-                }
-            } else {
-                orderData = rawValue;
-            }
-        }
-        // Проверяем Query
-        else if (req.query && req.query.order) {
-            rawValue = req.query.order;
-            try {
-                orderData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-            } catch (e) { }
+        if (typeof rawOrder === 'string') {
+            const match = rawOrder.match(/\d+/);
+            if (match) orderId = match[0];
+        } else if (rawOrder && typeof rawOrder === 'object') {
+            orderId = rawOrder.id;
         }
 
-        // 3. ИЗВЛЕЧЕНИЕ ID И ЗАПРОС В API (если пришла строка типа "order[id=173]")
-        if (!orderData && typeof rawValue === 'string') {
-            const match = rawValue.match(/\d+/);
-            if (match) {
-                const orderId = match[0];
-                const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
-                    params: { apiKey }
-                });
-                if (response.data.success) {
-                    orderData = response.data.order;
-                }
-            }
+        if (!orderId) {
+            return res.status(400).json({ error: "ID заказа не найден" });
         }
 
-        if (!orderData) {
-            return res.status(400).json({ error: "Заказ не найден" });
+        // 3. Запрос данных из API RetailCRM по ID
+        const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
+            params: { apiKey }
+        });
+
+        if (!response.data.success) {
+            return res.status(404).json({ error: "Заказ не найден в CRM" });
         }
 
-        const formatted = formatOrder(orderData);
+        // 4. Сохранение в Supabase
+        const formatted = formatOrder(response.data.order);
         const { error } = await supabase.from('orders').upsert(formatted);
+
         if (error) throw error;
 
         return res.status(200).send('OK');
 
-    } catch (globalError) {
-        console.error("Ошибка:", globalError.message);
-        return res.status(500).json({ error: globalError.message });
+    } catch (error) {
+        console.error("Ошибка:", error.message);
+        return res.status(500).json({ error: error.message });
     }
 }
