@@ -160,7 +160,7 @@ const App = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={cityData} onClick={(d) => d && d.activeLabel && setFilterCity(prev => prev === d.activeLabel ? null : d.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 600 }} />
                 <YAxis hide />
                 <Tooltip 
                   cursor={{ fill: 'rgba(255,255,255,0.05)' }} 
@@ -211,7 +211,7 @@ const App = () => {
         {/* Table Section */}
         <div className="glass-card rounded-[2.5rem] overflow-hidden border border-white/5">
           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 flex items-center gap-2">
               <Filter size={16} className="text-blue-500" /> Последние события
             </h3>
             <span className="text-[10px] bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full font-black uppercase">
@@ -220,7 +220,7 @@ const App = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="text-slate-500 text-[10px] uppercase font-black tracking-widest bg-white/5">
+              <thead className="text-slate-400 text-[10px] uppercase font-black tracking-widest bg-white/5">
                 <tr>
                   <SortableHeader label="Дата" columnKey="created_at" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Номер" columnKey="number" currentSort={sortConfig} onSort={requestSort} />
@@ -233,23 +233,23 @@ const App = () => {
               <tbody className="divide-y divide-white/5">
                 {processedOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-white/[0.03] transition-colors group">
-                    <td className="px-8 py-5 text-[11px] font-bold text-slate-500">
+                    <td className="px-8 py-5 text-[11px] font-bold text-slate-400">
                       {new Date(order.created_at).toLocaleDateString('ru-RU')}
                     </td>
                     <td className="px-8 py-5 text-xs font-black text-slate-200 tracking-tight">#{order.number}</td>
                     <td className="px-8 py-5">
                       <div className="text-xs text-slate-300 font-bold">{order.first_name} {order.last_name}</div>
-                      <div className="text-[9px] text-slate-500 uppercase mt-1 flex items-center gap-1">
+                      <div className="text-[9px] text-slate-400 uppercase mt-1 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: UTM_MAP[order.utm_source || 'direct']?.color }}></span>
                         {UTM_MAP[order.utm_source || 'direct']?.label}
                       </div>
                     </td>
                     <td className="px-8 py-5">
-                      <span className="text-xs font-bold text-slate-400">{order.city || '—'}</span>
+                      <span className="text-sm font-bold text-slate-300">{order.city || '—'}</span>
                     </td>
                     <td className="px-8 py-5">
                       <div className="text-sm font-black text-white">
-                        {Number(order.total_summ).toLocaleString()} <span className="text-[10px] text-slate-500 font-bold uppercase">₸</span>
+                        {Number(order.total_summ).toLocaleString()} <span className="text-[10px] text-slate-400 font-bold uppercase">₸</span>
                       </div>
                     </td>
                     <td className="px-8 py-5 text-center">
@@ -281,7 +281,7 @@ const KpiCard = ({ title, value, icon, color, glow }) => (
       {React.cloneElement(icon, { size: 28 })}
     </div>
     <div>
-      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">{title}</p>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{title}</p>
       <p className="text-3xl font-black text-white tracking-tighter">{value}</p>
     </div>
   </div>
