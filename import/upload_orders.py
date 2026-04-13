@@ -13,7 +13,7 @@ def main():
     
     # Чтение данных заказов из JSON
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_filename = os.path.join(script_dir, 'mock_orders.json')
+    json_filename = os.path.join(script_dir, 'mock_orders1.json')
     try:
         with open(json_filename, 'r', encoding='utf-8') as file:
             orders = json.load(file)
