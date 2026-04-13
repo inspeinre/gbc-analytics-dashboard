@@ -23,7 +23,6 @@ const formatOrder = (order) => {
         last_name: order.lastName || null,
         city: order.delivery?.address?.city || null,
         utm_source: order.customFields?.utm_source || null,
-        offer_replacement: order.customFields?.offer_replacement || null,
         raw_data: order,                     // Сохраняем весь оригинал заказа
         updated_at: new Date()
     };
