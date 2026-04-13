@@ -226,6 +226,7 @@ const App = () => {
                   <SortableHeader label="Номер" columnKey="number" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Клиент" columnKey="first_name" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Город" columnKey="city" currentSort={sortConfig} onSort={requestSort} />
+                  <SortableHeader label="Источник" columnKey="utm_source" currentSort={sortConfig} onSort={requestSort} />
                   <SortableHeader label="Сумма" columnKey="total_summ" currentSort={sortConfig} onSort={requestSort} />
                   <th className="px-8 py-5 text-center">Статус</th>
                 </tr>
@@ -239,13 +240,17 @@ const App = () => {
                     <td className="px-8 py-5 text-xs font-black text-slate-200 tracking-tight">#{order.number}</td>
                     <td className="px-8 py-5">
                       <div className="text-xs text-slate-300 font-bold">{order.first_name} {order.last_name}</div>
-                      <div className="text-[9px] text-slate-400 uppercase mt-1 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: UTM_MAP[order.utm_source || 'direct']?.color }}></span>
-                        {UTM_MAP[order.utm_source || 'direct']?.label}
-                      </div>
                     </td>
                     <td className="px-8 py-5">
                       <span className="text-sm font-bold text-slate-300">{order.city || '—'}</span>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2">
+                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: UTM_MAP[order.utm_source || 'direct']?.color }}></span>
+                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                           {UTM_MAP[order.utm_source || 'direct']?.label}
+                         </span>
+                      </div>
                     </td>
                     <td className="px-8 py-5">
                       <div className="text-sm font-black text-white">
