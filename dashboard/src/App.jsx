@@ -17,7 +17,7 @@ const supabase = createClient(
 const STATUS_MAP = {
   'new': { label: 'Новый', color: '#64748b' },
   'offer-replacement': { label: 'Предложить замену', color: '#f59e0b' },
-  'offer-analog': { label: 'Предложить замену', color: '#f59e0b' }, // Теперь тоже "Предложить замену"
+  'offer-analog': { label: 'Предложить замену', color: '#f59e0b' },
   'availability-confirmed': { label: 'В наличии', color: '#10b981' },
   'cancel': { label: 'Отмена', color: '#ef4444' },
   'complete': { label: 'Выполнен', color: '#6366f1' },
@@ -51,8 +51,8 @@ const App = () => {
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!//error) setRawOrders(data);
-      setLoading(false);
+    if (!error) setRawOrders(data);
+    setLoading(false);
   };
 
   useEffect(() => { fetchOrders(); }, []);
@@ -118,12 +118,15 @@ const App = () => {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">NOVA ANALYTICS</h1>
-            <p className="text-slate-500 font-semibold text-[11px] uppercase tracking-widest">Control Panel v2.2</p>
+            <p className="text-slate-500 font-semibold text-[11px] uppercase tracking-widest">Control Panel v2.4</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {(filterCity || filterUTM || sortConfig.key) && (
-              <button onClick={() => { setFilterCity(null); setFilterUTM(null); setSortConfig({ key: null, direction: null }); }} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg hover:bg-slate-50 font-bold shadow-sm text-xs transition-all">
-                <XCircle size={14} /> Сброс
+              <button
+                onClick={() => { setFilterCity(null); setFilterUTM(null); setSortConfig({ key: null, direction: null }); }}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 font-bold shadow-sm text-xs transition-all"
+              >
+                <XCircle size={14} /> Сбросить фильтры (Город, Источник)
               </button>
             )}
             <button onClick={fetchOrders} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-all"><RefreshCw size={18} className="text-slate-400" /></button>
@@ -190,12 +193,12 @@ const App = () => {
               <tbody className="divide-y divide-slate-100">
                 {processedOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-[10px] font-medium text-slate-400">
+                    <td className="px-6 py-4 text-[11px] font-medium text-slate-400">
                       {new Date(order.created_at).toLocaleDateString('ru-RU')}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-700">#{order.number}</td>
                     <td className="px-6 py-4 text-xs text-slate-600 font-semibold">{order.first_name} {order.last_name}</td>
-                    <td className="px-6 py-4 text-xs text-slate-500 font-medium">{order.city || '—'}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-slate-700">{order.city || '—'}</td>
                     <td className="px-6 py-4 font-bold text-slate-800 text-xs">
                       {Number(order.total_summ).toLocaleString()} <span className="text-[10px] text-slate-400 uppercase">₸</span>
                     </td>
