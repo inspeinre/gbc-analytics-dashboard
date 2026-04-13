@@ -57,7 +57,9 @@ export default async function handler(req, res) {
         }
 
         // 3. Запрос данных из API RetailCRM по ID
-        const response = await axios.get(getCrmUrl(`/orders/${orderId}`), {
+        const finalUrl = getCrmUrl(`/orders/${orderId}`);
+        console.log("ПОЛНЫЙ ЗАПРОС В CRM:", finalUrl); // Эта строка покажет нам правду
+        const response = await axios.get(finalUrl, {
             params: { apiKey }
         });
 
