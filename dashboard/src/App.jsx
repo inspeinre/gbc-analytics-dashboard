@@ -133,7 +133,7 @@ const App = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            {(filterCity || filterUTM || sortConfig.direction === null) && (
+            {(filterCity !== null || filterUTM !== null || sortConfig.key !== 'created_at' || sortConfig.direction !== 'desc') && (
                <button 
                 onClick={() => { setFilterCity(null); setFilterUTM(null); setSortConfig({ key: 'created_at', direction: 'desc' }); }}
                 className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 font-bold text-xs transition-all"
